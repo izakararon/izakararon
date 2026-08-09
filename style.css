@@ -1,0 +1,38 @@
+:root {
+  --glitched-duration: 0.9s;
+  --glitched-long-duration: 3s;
+  --yellow-color: #f9f002;
+  --yellow-color-opacity: #f9f00242;
+  --orange-color: #ff9800;
+  --border-color: #8ae66e;
+  --red-color: #ff003c;
+  --blue-color: #0c5f74;
+  --green-color: #298d29;
+  --purple-color: purple;
+  --neon-color: #39ff14;
+  --black-color: #000;
+}
+
+body {
+  background-color: var(--yellow-color);
+  color: var(--black-color);
+  padding: 5%;
+}
+
+iframe {
+  padding: 30px;
+  padding-left: 5px;
+  padding-right: 5px;
+  padding-bottom: 15px;
+  clip-path: polygon(0px 25px, 26px 0px, calc(60% - 25px) 0px, 60% 25px, 100% 25px, 100% calc(100% - 10px), calc(100% - 15px) calc(100% - 10px), calc(80% - 10px) calc(100% - 10px), calc(80% - 15px) calc(100% - 0px), 10px calc(100% - 0px), 0% calc(100% - 10px));
+  background-color: var(--black-color);
+  max-width: calc(100% - 10px);
+}
+
+hr {
+  height: 14px;
+  background-color: var(--black-color);
+  width: 100%;
+  border: none;
+  clip-path: polygon(0px 7px, 100% 7px, 100% 8px, 0px 8px);
+}
