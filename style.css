@@ -1,22 +1,59 @@
+@font-face {
+  font-family: BlenderProBook;
+  font-style: normal;
+  font-weight: 400;
+  src: url(fonts/BlenderProBook.woff2) format("woff2");
+}
+
+@font-face {
+  font-family: Oxanium;
+  font-style: normal;
+  font-weight: 400;
+  src: url(fonts/Oxanium.woff2) format('woff2');
+}
+
 :root {
-  --glitched-duration: 0.9s;
-  --glitched-long-duration: 3s;
-  --yellow-color: #f9f002;
-  --yellow-color-opacity: #f9f00242;
-  --orange-color: #ff9800;
-  --border-color: #8ae66e;
+  --yellow-color: #fcee09;
   --red-color: #ff003c;
-  --blue-color: #0c5f74;
-  --green-color: #298d29;
-  --purple-color: purple;
-  --neon-color: #39ff14;
-  --black-color: #000;
+  --black-color: #050a0e;
+  --dark-color: #333;
+  --blue-color: #00f0ff;
+  --cyan-color: #00ffd2;
+}
+
+html {
+  font-family: "BlenderProBook";
+  font-size: 20px;
 }
 
 body {
   background-color: var(--yellow-color);
-  color: var(--black-color);
+  color: var(--dark-color);
   padding: 5%;
+}
+
+.code,
+code,
+.code-block {
+  background-color: var(--dark-color);
+  color: var(--cyan-color);
+  padding: .3rem .4rem .2rem .4rem;
+  font-family: Oxanium !important;
+  font-size: .75rem;
+  overflow-wrap: break-word;
+}
+
+.code-block {
+  clip-path: polygon(0 0, 0 100%, calc(100% - 20px) 100%, 100% calc(100% - 20px), 100% 0);
+  display: block;
+  padding: .5rem .6rem .4rem .6rem;
+}
+
+.code-block::before {
+  content: attr(data-title);
+  display: block;
+  color: var(--yellow-color);
+  text-shadow: var(--cyan-color) 1px 1px;
 }
 
 iframe {
