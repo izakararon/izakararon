@@ -67,9 +67,7 @@ iframe {
 }
 
 hr {
-  height: 14px;
+  height: 1px;
   background-color: var(--black-color);
-  width: 100%;
   border: none;
-  clip-path: polygon(0px 7px, 100% 7px, 100% 8px, 0px 8px);
 }
