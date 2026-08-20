@@ -52,6 +52,10 @@ main {
   max-width: 40ch;
 }
 
+a {
+  color: var(--blue-color);
+}
+
 .cyberpunk-font,
 .cyberpunk-font *,
 .cyberpunk-font-og,
