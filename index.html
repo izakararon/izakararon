@@ -14,22 +14,30 @@
 
 <body>
   <header>
-    <div id="header" class="cyber-razor-bottom" style="padding-top: 10px;">
+    <div id="header" class="cyber-razor-bottom">
       <div>
-        <span class="cyberpunk-font-og f-x0-7">
+        <span class="ia cyberpunk-font-og f-x0-7">
           <span class="i">I</span> <span class="a">A</span>
         </span>
       </div>
       <div>
-        <input type="checkbox" id="menu-toggle">
-        <label for="menu-toggle" class="btn-open">☰</label>
+        <input type="checkbox" id="menu-toggle" class="menu-checkbox" aria-label="Toggle menu">
 
-        <div class="overlay">
-          <label for="menu-toggle" class="btn-close">✕</label>
-          <a href="#">JOURNAL</a>
-          <a href="#">MAP</a>
-          <a href="#">STUFF</a>
-        </div>
+        <!-- 2. The hamburger icon acts as the clickable label for the checkbox -->
+        <label for="menu-toggle" class="menu-button">
+          <span class="hamburger"></span>
+        </label>
+
+        <!-- 3. The full-screen overlay -->
+        <nav class="fullscreen-menu cyber-razor-bottom">
+          <ul class="menu-links">
+            <li><a href="/">JOURNAL</a></li>
+            <li><a href="/map">MAP</a></li>
+            <li><a href="/stuff">STUFF</a></li>
+            <li><a href="/contacts">CONTACTS</a></li>
+          </ul>
+        </nav>
+
       </div>
 
     </div>
@@ -84,9 +92,9 @@
             when i cant see
           </p>
           <iframe data-testid="embed-iframe" style="border-radius:12px"
-            src="https://open.spotify.com/embed/track/6G9LCA3LyaIXTIWA1uIUoN?utm_source=generator" width="100%" height="152" frameBorder="0"
-            allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"></iframe>
+            src="https://open.spotify.com/embed/track/6G9LCA3LyaIXTIWA1uIUoN?utm_source=generator" width="100%"
+            height="152" frameBorder="0" allowfullscreen=""
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
           <p>
             had a wise mentor in high school<br>
             an orthodox jewish rabbi<br>
