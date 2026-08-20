@@ -24,6 +24,7 @@
   --dark-color: #333;
   --blue-color: #00f0ff;
   --cyan-color: #00ffd2;
+  --white-color: #fff;
 }
 
 html {
@@ -34,8 +35,8 @@ html {
 }
 
 body {
-  background-color: var(--yellow-color);
-  color: var(--dark-color);
+  background-color: var(--dark-color);
+  color: var(--white-color);
   padding: 0%;
   margin: 0%;
 }
@@ -50,12 +51,10 @@ main {
   width: 100%;
   max-width: 40ch;
 }
-/* p { */
-/*   white-space: nowrap; */
-/*   overflow: hidden; */
-/*   text-overflow: ellipsis; */
-/*   max-width: 75ch; */
-/* } */
+
+a {
+  color: var(--blue-color);
+}
 
 .cyberpunk-font,
 .cyberpunk-font *,
@@ -107,7 +106,7 @@ main {
 .code,
 code,
 .code-block {
-  background-color: var(--dark-color);
+  background-color: var(--black-color);
   color: var(--cyan-color);
   padding: .3rem .4rem .2rem .4rem;
   font-family: Oxanium !important;
@@ -134,13 +133,13 @@ iframe {
   padding-right: 5px;
   padding-bottom: 15px;
   clip-path: polygon(0px 25px, 26px 0px, calc(60% - 25px) 0px, 60% 25px, 100% 25px, 100% calc(100% - 10px), calc(100% - 15px) calc(100% - 10px), calc(80% - 10px) calc(100% - 10px), calc(80% - 15px) calc(100% - 0px), 10px calc(100% - 0px), 0% calc(100% - 10px));
-  background-color: var(--dark-color);
+  background-color: var(--black-color);
   max-width: calc(100% - 10px);
 }
 
 hr {
   height: 1px;
-  background-color: var(--dark-color);
+  background-color: var(--white-color);
   border: none;
 }
 
@@ -166,6 +165,30 @@ hr {
   height: 25px;
   z-index: 1;
 }
+
+.cyber-tile,
+.cyber-tile-small,
+.cyber-tile-big {
+  --tile-width: 100%;
+  /* --tile-padding: 4px; */
+  --tile-edges: 20px;
+  --label-margins: calc(var(--tile-edges) - var(--tile-padding));
+  --og-clip-path: polygon(0 0, 0 calc(100% - var(--tile-edges)), var(--tile-edges) 100%, 100% 100%, 100% var(--tile-edges), calc(100% - var(--tile-edges)) 0);
+  width: var(--tile-width);
+  min-height: 54px;
+  clip-path: var(--og-clip-path);
+  padding: var(--tile-padding);
+  padding-bottom: var(--tile-edges);
+}
+
+.cyber-tile img,
+.cyber-tile-small img,
+.cyber-tile-big img {
+  width: auto;
+  height: auto;
+  clip-path: polygon(0 0, 0 100%, 100% 100%, 100% var(--tile-edges), calc(100% - var(--tile-edges)) 0);
+}
+
 
 .f-x0-7 {
   font-size: 0.7em !important;
