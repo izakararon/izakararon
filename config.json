@@ -1,0 +1,13 @@
+{
+  "port": 4443,
+  "root": "./data",
+  "conneg": false,
+  "notifications": false,
+  "idp": true,
+  "idpIssuer": "https://izakararon.com",
+  "nostr": false,
+  "inviteOnly": true,
+  "subdomain": false,
+  "provisionKeys": true,
+  "mashlibCdn": false
+}

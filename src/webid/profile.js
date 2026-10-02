@@ -1,0 +1,231 @@
+/**
+ * WebID Profile generation
+ *
+ * Creates profile documents following Solid conventions. Default profile
+ * shape is now plain JSON-LD at `profile/card.jsonld` — operators who
+ * want a human-readable HTML shell can serve their own `index.html` with
+ * an embedded `<script type="application/ld+json">` data island.
+ */
+
+const FOAF = 'http://xmlns.com/foaf/0.1/';
+const SOLID = 'http://www.w3.org/ns/solid/terms#';
+const SCHEMA = 'http://schema.org/';
+const LDP = 'http://www.w3.org/ns/ldp#';
+const PIM = 'http://www.w3.org/ns/pim/space#';
+const CID = 'https://www.w3.org/ns/cid/v1#';
+const LWS = 'https://www.w3.org/ns/lws#';
+
+/**
+ * Generate JSON-LD data for a WebID profile.
+ *
+ * @param {object} options
+ * @param {string} options.webId - Full WebID URI (e.g., https://example.com/alice/profile/card#me)
+ * @param {string} options.name - Display name
+ * @param {string} options.podUri - Pod root URI (e.g., https://example.com/alice/)
+ * @param {string} options.issuer - OIDC issuer URI
+ * @param {object} [options.ownerVm] - Optional verificationMethod
+ *   entry for an owner-held key (Phase 2 of #437 / #443). Build via
+ *   `src/keys/provision.js#buildOwnerVerificationMethod`.
+ *
+ *   **Fresh-pod-only when `ownerVm` is set.** The helper unconditionally
+ *   overwrites `verificationMethod`, `authentication`, and
+ *   `assertionMethod` with single-element arrays referencing this VM.
+ *   That's correct for the only current caller (fresh pod creation,
+ *   nothing to overwrite), but a future "rotate-keys" / re-provisioning
+ *   command using this helper to regenerate an existing profile would
+ *   silently drop any VMs / proof-purpose references the operator
+ *   added by hand. Either pass the existing profile through a merge
+ *   step before calling this, or treat the helper as fresh-pod-only.
+ *   See #444 review.
+ *
+ * @returns {object} JSON-LD profile data
+ */
+export function generateProfileJsonLd({ webId, name, podUri, issuer, ownerVm = null }) {
+  const pod = podUri.endsWith('/') ? podUri : podUri + '/';
+  // Document URL is the WebID without its fragment; service entries use
+  // fragment ids resolved against it.
+  const docUrl = webId.split('#')[0];
+
+  return {
+    // CID v1 vocabulary is declared inline (rather than via an imported
+    // context URL) so JSS's JSON-LD → Turtle conneg layer can expand
+    // every term without fetching external contexts. Semantically
+    // equivalent to importing https://www.w3.org/ns/cid/v1: the IRIs
+    // each term expands to are the same. This keeps the profile a valid
+    // W3C Controlled Identifier document per LWS 1.0 (#386 Phase A).
+    '@context': {
+      'foaf': FOAF,
+      'solid': SOLID,
+      'schema': SCHEMA,
+      'pim': PIM,
+      'ldp': LDP,
+      'cid': CID,
+      'lws': LWS,
+      'inbox': { '@id': 'ldp:inbox', '@type': '@id' },
+      'storage': { '@id': 'pim:storage', '@type': '@id' },
+      'oidcIssuer': { '@id': 'solid:oidcIssuer', '@type': '@id' },
+      'preferencesFile': { '@id': 'pim:preferencesFile', '@type': '@id' },
+      'publicTypeIndex': { '@id': 'solid:publicTypeIndex', '@type': '@id' },
+      'privateTypeIndex': { '@id': 'solid:privateTypeIndex', '@type': '@id' },
+      'isPrimaryTopicOf': { '@id': 'foaf:isPrimaryTopicOf', '@type': '@id' },
+      'mainEntityOfPage': { '@id': 'schema:mainEntityOfPage', '@type': '@id' },
+      'service': { '@id': 'cid:service', '@container': '@set' },
+      'serviceEndpoint': { '@id': 'cid:serviceEndpoint', '@type': '@id' },
+      // CID v1 terms used by Phase A and prepped for Phase B (the
+      // standalone "add my keys" app). Declaring these now means the
+      // app can PATCH in verificationMethod entries without having to
+      // also rewrite the @context.
+      //
+      // verificationMethod: NO @type:@id — values are inline verification
+      //   method *objects* (id/type/controller/publicKey…), not just IRI
+      //   references. @container:@set so a single entry stays an array.
+      // authentication / assertionMethod: @type:@id — values reference a
+      //   verificationMethod entry by its IRI. @container:@set for arrays.
+      // publicKeyJwk: @type:@json so the JWK object round-trips as a
+      //   literal JSON value (rdf:JSON datatype). Note: JSS's Turtle
+      //   conneg layer doesn't yet emit @type:@json literals (tracked as
+      //   a Phase B blocker in the PR description); declaring here is
+      //   forward-looking and spec-correct.
+      'controller':         { '@id': 'cid:controller', '@type': '@id' },
+      'verificationMethod': { '@id': 'cid:verificationMethod', '@container': '@set' },
+      'authentication':     { '@id': 'cid:authentication', '@type': '@id', '@container': '@set' },
+      'assertionMethod':    { '@id': 'cid:assertionMethod', '@type': '@id', '@container': '@set' },
+      'publicKeyJwk':       { '@id': 'cid:publicKeyJwk', '@type': '@json' },
+      'publicKeyMultibase': { '@id': 'cid:publicKeyMultibase' },
+      // CID v1 verificationMethod *class* names (#417). Without these
+      // term mappings, an app PATCHing in a VM with `type: "Multikey"`
+      // (the spec-example shape) emits a bare relative-IRI `<Multikey>`
+      // when JSS conneg-converts the profile to Turtle — which then
+      // resolves against the document's base URL to a fictional class
+      // like `<pod>/profile/Multikey`. Mapping the class names here
+      // means the bare term `"Multikey"` in JSON-LD expands correctly
+      // (cid:Multikey → https://www.w3.org/ns/cid/v1#Multikey) for both
+      // JSON-LD processors AND our Turtle conneg layer. Naive JSON
+      // readers comparing `type === "Multikey"` continue to work.
+      'Multikey':           'cid:Multikey',
+      'JsonWebKey':         'cid:JsonWebKey'
+    },
+    '@id': webId,
+    '@type': ['foaf:Person', 'schema:Person'],
+    'foaf:name': name,
+    'isPrimaryTopicOf': '',
+    'mainEntityOfPage': '',
+    // CID v1 self-control: the WebID is its own controller. Phase A of
+    // #386 ships this triple even with no verificationMethods yet, so a
+    // future Phase B "add-keys" app PATCHing in verificationMethod
+    // entries doesn't have to also wire up controllership separately.
+    'controller': webId,
+    'inbox': `${pod}inbox/`,
+    'storage': pod,
+    'oidcIssuer': issuer,
+    'preferencesFile': `${pod}settings/prefs.jsonld`,
+    'publicTypeIndex': `${pod}settings/publicTypeIndex.jsonld`,
+    'privateTypeIndex': `${pod}settings/privateTypeIndex.jsonld`,
+    // LWS 1.0 Controlled Identifier service entry — mirrors `oidcIssuer` so
+    // LWS-aware verifiers can establish trust. Additive; the legacy
+    // `solid:oidcIssuer` predicate stays for existing Solid clients.
+    'service': [
+      {
+        '@id': `${docUrl}#oidc`,
+        '@type': 'lws:OpenIdProvider',
+        'serviceEndpoint': issuer
+      }
+    ],
+    // Optional: a verificationMethod for an owner-held key, populated
+    // when the pod was created with `--provision-keys` (Phase 2 of
+    // #437 / #443). The VM lands the public side of the owner key
+    // into the profile so the existing LWS-CID verifier in
+    // src/auth/lws-cid.js can authenticate JWTs signed with the
+    // matching secret. Both `publicKeyMultibase` (CID v1.0
+    // conformance) and `publicKeyJwk` (LWS-CID compat) are emitted by
+    // src/keys/provision.js's buildOwnerVerificationMethod helper.
+    //
+    // The VM is also referenced from `authentication` and
+    // `assertionMethod` so the same key counts as an authentication
+    // factor without an app needing to PATCH those arrays separately.
+    ...(ownerVm && {
+      verificationMethod: [ownerVm],
+      authentication: [ownerVm['@id']],
+      assertionMethod: [ownerVm['@id']]
+    })
+  };
+}
+
+/**
+ * Generate the profile document as a plain JSON-LD object.
+ *
+ * Previously returned an HTML shell with an embedded data island; that
+ * shell still exists for hand-curated personal sites, but server-default
+ * profiles are now plain JSON-LD for predictability and easier
+ * post-processing by clients.
+ *
+ * @param {object} options
+ * @param {string} options.webId - Full WebID URI
+ * @param {string} options.name - Display name
+ * @param {string} options.podUri - Pod root URI
+ * @param {string} options.issuer - OIDC issuer URI
+ * @param {object} [options.ownerVm] - Optional verificationMethod entry
+ *   for an owner-held key (Phase 2 of #437 / #443). When set, lands
+ *   the VM in `verificationMethod` and references it from
+ *   `authentication` + `assertionMethod`. Build via
+ *   `src/keys/provision.js#buildOwnerVerificationMethod`.
+ * @returns {object} JSON-LD profile document
+ */
+export function generateProfile({ webId, name, podUri, issuer, ownerVm = null }) {
+  return generateProfileJsonLd({ webId, name, podUri, issuer, ownerVm });
+}
+
+/**
+ * Generate preferences file as JSON-LD.
+ * @param {object} options
+ * @param {string} options.webId - Full WebID URI
+ * @param {string} options.podUri - Pod root URI
+ * @returns {object} JSON-LD preferences document
+ */
+export function generatePreferences({ webId, podUri }) {
+  const pod = podUri.endsWith('/') ? podUri : podUri + '/';
+
+  return {
+    '@context': {
+      'solid': SOLID,
+      'pim': PIM,
+      'publicTypeIndex': { '@id': 'solid:publicTypeIndex', '@type': '@id' },
+      'privateTypeIndex': { '@id': 'solid:privateTypeIndex', '@type': '@id' }
+    },
+    '@id': `${pod}settings/prefs.jsonld`,
+    'publicTypeIndex': `${pod}settings/publicTypeIndex.jsonld`,
+    'privateTypeIndex': `${pod}settings/privateTypeIndex.jsonld`
+  };
+}
+
+/**
+ * Generate an empty type index.
+ * Per the Solid Type Indexes spec, a public index is additionally typed
+ * `solid:ListedDocument` and a private one `solid:UnlistedDocument`.
+ * @param {string} uri - URI of the type index
+ * @param {object} [opts]
+ * @param {boolean} [opts.listed] - true for publicTypeIndex, false for privateTypeIndex.
+ *   If omitted, only `solid:TypeIndex` is set (back-compat).
+ * @returns {object} JSON-LD type index document
+ */
+export function generateTypeIndex(uri, opts = {}) {
+  const types = ['solid:TypeIndex'];
+  if (opts.listed === true) types.push('solid:ListedDocument');
+  else if (opts.listed === false) types.push('solid:UnlistedDocument');
+  return {
+    '@context': {
+      'solid': SOLID
+    },
+    '@id': uri,
+    '@type': types.length === 1 ? types[0] : types
+  };
+}
+
+/**
+ * Serialize JSON-LD to string
+ * @param {object} jsonLd
+ * @returns {string}
+ */
+export function serialize(jsonLd) {
+  return JSON.stringify(jsonLd, null, 2);
+}

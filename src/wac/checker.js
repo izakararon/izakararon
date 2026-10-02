@@ -1,0 +1,351 @@
+/**
+ * WAC (Web Access Control) Checker
+ * Checks if an agent has permission to access a resource
+ */
+
+import * as storage from '../storage/filesystem.js';
+import { parseAcl, AccessMode, AgentClass } from './parser.js';
+import { getAclUrl } from '../ldp/headers.js';
+import { readLedger, getBalance, debit } from '../webledger.js';
+
+/**
+ * Check if agent has required access mode for resource
+ * @param {object} options
+ * @param {string} options.resourceUrl - Full URL of the resource
+ * @param {string} options.resourcePath - Path portion of the resource URL
+ * @param {boolean} options.isContainer - Whether resource is a container
+ * @param {string|null} options.agentWebId - WebID of the agent (null for unauthenticated)
+ * @param {string} options.requiredMode - Required access mode (from AccessMode)
+ * @param {boolean} [options.noDebit=false] - When true, evaluate a
+ *   PaymentCondition without charging the ledger. A positive-cost paid grant
+ *   is treated as not-satisfied (returns paymentRequired) rather than debited.
+ *   Used by secondary/guard checks (e.g. the POST sidecar Control gate in
+ *   handlePost) so a single request cannot debit twice or charge silently;
+ *   the authoritative debit stays in the primary authorize() hook.
+ * @returns {Promise<{
+ *   allowed: boolean,
+ *   wacAllow: string,
+ *   paymentRequired?: object|null,
+ *   paid?: number,
+ *   balance?: number,
+ *   currency?: string
+ * }>}
+ *   `paymentRequired` carries the unmet PaymentCondition (present when a paid
+ *   grant is denied, including every `noDebit` denial). `paid`/`balance`/
+ *   `currency` are set only when a debit actually occurred. The no-ACL deny
+ *   path returns just `{allowed, wacAllow}`.
+ */
+export async function checkAccess({
+  resourceUrl,
+  resourcePath,
+  isContainer,
+  agentWebId,
+  requiredMode,
+  noDebit = false
+}) {
+  // Find applicable ACL
+  const aclResult = await findApplicableAcl(resourceUrl, resourcePath, isContainer);
+
+  if (!aclResult) {
+    // No ACL found - deny by default (restrictive mode)
+    // Security: Require explicit ACL for any access
+    return { allowed: false, wacAllow: 'user="", public=""' };
+  }
+
+  const { authorizations, isDefault, targetUrl: aclContainerUrl } = aclResult;
+
+  // Check authorizations
+  // Note: For default ACLs, we check if the ACL's default rules apply to the actual resource URL
+  const result = await checkAuthorizations(
+    authorizations,
+    resourceUrl,  // Use actual resource URL, not the ACL container URL
+    agentWebId,
+    requiredMode,
+    isDefault,
+    noDebit
+  );
+
+  // Calculate WAC-Allow header
+  const wacAllow = calculateWacAllow(authorizations, resourceUrl, agentWebId, isDefault);
+
+  return { allowed: result.allowed, wacAllow, paymentRequired: result.paymentRequired || null, paid: result.paid, balance: result.balance, currency: result.currency };
+}
+
+/**
+ * Find the applicable ACL for a resource
+ * Walks up the path hierarchy looking for .acl files
+ */
+async function findApplicableAcl(resourceUrl, resourcePath, isContainer) {
+  // First check for resource-specific ACL
+  const resourceAclPath = isContainer
+    ? (resourcePath.endsWith('/') ? resourcePath : resourcePath + '/') + '.acl'
+    : resourcePath + '.acl';
+
+  if (await storage.exists(resourceAclPath)) {
+    const content = await storage.read(resourceAclPath);
+    if (content) {
+      const aclUrl = getAclUrl(resourceUrl, isContainer);
+      const authorizations = await parseAcl(content.toString(), aclUrl);
+      return { authorizations, isDefault: false, targetUrl: resourceUrl };
+    }
+  }
+
+  // Walk up the hierarchy looking for default ACLs
+  // Track both storage path (for file lookup) and URL path (for URL construction)
+  let currentStoragePath = resourcePath;
+  let currentUrlPath = new URL(resourceUrl).pathname;
+
+  while (currentStoragePath && currentStoragePath !== '/') {
+    // Get parent container
+    const parentStoragePath = getParentPath(currentStoragePath);
+    const parentAclPath = parentStoragePath + '.acl';
+
+    if (await storage.exists(parentAclPath)) {
+      const content = await storage.read(parentAclPath);
+      if (content) {
+        // Get parent URL path and construct full URL
+        const parentUrlPath = getParentPath(currentUrlPath);
+        const origin = resourceUrl.substring(0, resourceUrl.indexOf('/', 8));
+        const parentUrl = origin + parentUrlPath;
+        const parentAclUrl = getAclUrl(parentUrl, true); // Container ACL URL
+        const authorizations = await parseAcl(content.toString(), parentAclUrl);
+        return { authorizations, isDefault: true, targetUrl: parentUrl };
+      }
+    }
+
+    currentStoragePath = parentStoragePath;
+    currentUrlPath = getParentPath(currentUrlPath);
+  }
+
+  // Check root ACL
+  if (await storage.exists('/.acl')) {
+    const content = await storage.read('/.acl');
+    if (content) {
+      const rootUrl = resourceUrl.substring(0, resourceUrl.indexOf('/', 8) + 1);
+      const rootAclUrl = getAclUrl(rootUrl, true); // Root container ACL URL
+      const authorizations = await parseAcl(content.toString(), rootAclUrl);
+      return { authorizations, isDefault: true, targetUrl: rootUrl };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get parent container path
+ */
+function getParentPath(path) {
+  // Remove trailing slash
+  const normalized = path.endsWith('/') ? path.slice(0, -1) : path;
+  const lastSlash = normalized.lastIndexOf('/');
+  if (lastSlash <= 0) return '/';
+  return normalized.substring(0, lastSlash + 1);
+}
+
+/**
+ * Check if any authorization grants the required mode
+ */
+// Supported condition types
+const SUPPORTED_CONDITIONS = ['PaymentCondition', 'https://webacl.org/ns#PaymentCondition'];
+
+async function checkAuthorizations(authorizations, targetUrl, agentWebId, requiredMode, isDefault, noDebit = false) {
+  for (const auth of authorizations) {
+    // For default ACLs, check if auth has default rules and matches target
+    // For direct ACLs, check if accessTo matches target
+    if (isDefault) {
+      // Skip if no default rules defined
+      if (auth.default.length === 0) continue;
+      // Skip if target URL doesn't match any default URL prefix
+      if (!auth.default.some(d => urlMatches(d, targetUrl, true))) continue;
+    } else {
+      // Skip if accessTo doesn't match target
+      if (!auth.accessTo.some(a => urlMatches(a, targetUrl))) continue;
+    }
+
+    // Check if agent is authorized
+    const agentAuthorized = isAgentAuthorized(auth, agentWebId);
+    if (!agentAuthorized) continue;
+
+    // Check if mode is granted
+    const modeGranted = auth.modes.includes(requiredMode) ||
+      (requiredMode === AccessMode.APPEND && auth.modes.includes(AccessMode.WRITE));
+    if (!modeGranted) continue;
+
+    // Check conditions (fail-closed)
+    if (auth.conditions && auth.conditions.length > 0) {
+      // Fail-closed: skip this auth if any condition type is unsupported
+      const unsupported = auth.conditions.find(c => !SUPPORTED_CONDITIONS.includes(c.type));
+      if (unsupported) continue;
+
+      // Check payment condition
+      const paymentCondition = auth.conditions.find(c =>
+        c.type === 'PaymentCondition' || c.type === 'https://webacl.org/ns#PaymentCondition'
+      );
+      if (paymentCondition) {
+        const parsed = parseInt(paymentCondition.amount, 10);
+        const cost = Number.isNaN(parsed) ? -1 : parsed;
+        const currency = paymentCondition.currency || 'sat';
+
+        // Skip invalid amounts
+        if (cost < 0) continue;
+
+        if (agentWebId) {
+          try {
+            const ledger = await readLedger();
+
+            // Zero-cost gate: verify they have a ledger entry (have deposited at some point)
+            if (cost === 0) {
+              const hasEntry = ledger.entries?.some(e => e.url === agentWebId);
+              if (hasEntry) return { allowed: true };
+            }
+
+            // Paid access: check balance and deduct
+            const balance = getBalance(ledger, agentWebId, currency);
+            if (cost > 0 && balance >= cost) {
+              // Guard checks must not charge: a paid grant is left unsatisfied
+              // here so billing happens once, in the primary authorize() path.
+              if (noDebit) {
+                return { allowed: false, paymentRequired: paymentCondition };
+              }
+              const result = debit(ledger, agentWebId, cost, currency);
+              const { writeLedger } = await import('../webledger.js');
+              await writeLedger(ledger);
+              return { allowed: true, paid: cost, balance: result.balance, currency };
+            }
+          } catch (e) {
+            // Ledger read failed — fall through to payment required
+          }
+        }
+        return { allowed: false, paymentRequired: paymentCondition };
+      }
+    }
+
+    return { allowed: true };
+  }
+
+  return { allowed: false };
+}
+
+/**
+ * Check if the agent is authorized by an authorization rule
+ */
+function isAgentAuthorized(auth, agentWebId) {
+  // Check specific agent
+  if (agentWebId && auth.agents.includes(agentWebId)) {
+    return true;
+  }
+
+  // Check agent classes
+  for (const agentClass of auth.agentClasses) {
+    // foaf:Agent - everyone (including unauthenticated)
+    if (agentClass === AgentClass.AGENT || agentClass === 'foaf:Agent') {
+      return true;
+    }
+
+    // acl:AuthenticatedAgent - any authenticated user
+    if (agentWebId && (agentClass === AgentClass.AUTHENTICATED || agentClass === 'acl:AuthenticatedAgent')) {
+      return true;
+    }
+  }
+
+  // TODO: Check agent groups (requires fetching and parsing group documents)
+
+  return false;
+}
+
+/**
+ * Check if URLs match (handles trailing slashes)
+ * @param {string} pattern - The ACL URL pattern
+ * @param {string} url - The target URL to check
+ * @param {boolean} prefixMatch - If true, check if url starts with pattern (for acl:default)
+ */
+function urlMatches(pattern, url, prefixMatch = false) {
+  const normalizedPattern = pattern.replace(/\/$/, '');
+  const normalizedUrl = url.replace(/\/$/, '');
+
+  if (prefixMatch) {
+    // For default ACLs: target must be same as or under the pattern
+    return normalizedUrl === normalizedPattern ||
+           normalizedUrl.startsWith(normalizedPattern + '/');
+  }
+
+  return normalizedPattern === normalizedUrl;
+}
+
+/**
+ * Calculate WAC-Allow header value
+ */
+function calculateWacAllow(authorizations, targetUrl, agentWebId, isDefault) {
+  const userModes = new Set();
+  const publicModes = new Set();
+
+  for (const auth of authorizations) {
+    // Check if applies to resource - use same logic as checkAuthorizations
+    if (isDefault) {
+      if (auth.default.length === 0) continue;
+      if (!auth.default.some(d => urlMatches(d, targetUrl, true))) continue;
+    } else {
+      if (!auth.accessTo.some(a => urlMatches(a, targetUrl))) continue;
+    }
+
+    // Check what modes this grants
+    const modes = auth.modes.map(m => {
+      if (m === AccessMode.READ || m === 'acl:Read') return 'read';
+      if (m === AccessMode.WRITE || m === 'acl:Write') return 'write';
+      if (m === AccessMode.APPEND || m === 'acl:Append') return 'append';
+      if (m === AccessMode.CONTROL || m === 'acl:Control') return 'control';
+      return null;
+    }).filter(Boolean);
+
+    // Check if public
+    const isPublic = auth.agentClasses.some(c =>
+      c === AgentClass.AGENT || c === 'foaf:Agent'
+    );
+
+    if (isPublic) {
+      modes.forEach(m => publicModes.add(m));
+    }
+
+    // Check if user-specific
+    if (agentWebId && auth.agents.includes(agentWebId)) {
+      modes.forEach(m => userModes.add(m));
+    }
+
+    // Check authenticated class
+    if (agentWebId && auth.agentClasses.some(c =>
+      c === AgentClass.AUTHENTICATED || c === 'acl:AuthenticatedAgent'
+    )) {
+      modes.forEach(m => userModes.add(m));
+    }
+  }
+
+  // User also gets public modes
+  publicModes.forEach(m => userModes.add(m));
+
+  const userStr = Array.from(userModes).join(' ');
+  const publicStr = Array.from(publicModes).join(' ');
+
+  return `user="${userStr}", public="${publicStr}"`;
+}
+
+/**
+ * Get the required access mode for an HTTP method
+ * @param {string} method - HTTP method
+ * @returns {string} Access mode
+ */
+export function getRequiredMode(method) {
+  switch (method.toUpperCase()) {
+    case 'GET':
+    case 'HEAD':
+    case 'OPTIONS':
+      return AccessMode.READ;
+    case 'POST':
+      return AccessMode.APPEND;
+    case 'PUT':
+    case 'PATCH':
+    case 'DELETE':
+      return AccessMode.WRITE;
+    default:
+      return AccessMode.READ;
+  }
+}

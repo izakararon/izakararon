@@ -1,0 +1,71 @@
+{
+  "name": "javascript-solid-server",
+  "version": "0.0.220",
+  "description": "A minimal, fast Solid server",
+  "main": "src/index.js",
+  "type": "module",
+  "bin": {
+    "jss": "./bin/jss.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JavaScriptSolidServer/JavaScriptSolidServer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JavaScriptSolidServer/JavaScriptSolidServer/issues"
+  },
+  "homepage": "https://github.com/JavaScriptSolidServer/JavaScriptSolidServer#readme",
+  "scripts": {
+    "start": "node bin/jss.js start",
+    "dev": "node --watch bin/jss.js start",
+    "publish:blog": "rsync -av --exclude='*.acl' seed/ data/",
+    "test": "node --test --test-concurrency=1 'test/*.test.js'",
+    "test:live-reload": "node test/live-reload.standalone.js",
+    "test:cth": "node scripts/test-cth-compat.js",
+    "benchmark": "node benchmark.js"
+  },
+  "dependencies": {
+    "@fastify/middie": "^8.3.3",
+    "@fastify/rate-limit": "^9.1.0",
+    "@fastify/websocket": "^8.3.1",
+    "@noble/curves": "^1.2.0",
+    "@noble/hashes": "^1.3.2",
+    "@simplewebauthn/server": "^13.2.2",
+    "bcryptjs": "^3.0.3",
+    "commander": "^14.0.2",
+    "fastify": "^4.29.1",
+    "fs-extra": "^11.2.0",
+    "jose": "^6.1.3",
+    "microfed": "^0.0.14",
+    "mime-types": "^2.1.35",
+    "n3": "^1.26.0",
+    "oidc-provider": "^9.6.0",
+    "secure-json-parse": "^2.7.0",
+    "sql.js": "^1.13.0",
+    "tar-stream": "^3.2.0"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "keywords": [
+    "solid",
+    "ldp",
+    "linked-data",
+    "decentralized",
+    "activitypub",
+    "fediverse",
+    "nostr",
+    "json-ld",
+    "webid",
+    "mcp",
+    "agent",
+    "agentic"
+  ],
+  "license": "AGPL-3.0-only",
+  "optionalDependencies": {
+    "mongodb": "^6.21.0"
+  },
+  "devDependencies": {
+    "autocannon": "^8.0.0"
+  }
+}
