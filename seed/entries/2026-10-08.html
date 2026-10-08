@@ -4,15 +4,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="/style.css" rel="stylesheet">
+  <link href="../style.css" rel="stylesheet">
   <link rel="icon" href="/favicon.ico">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/images/android-chrome-192x192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/images/android-chrome-512x512.png">
-  <title>izakar</title>
+  <title>2026-10-08 — izakar</title>
 </head>
 
-<body>
+<body prefix="schema: http://schema.org/">
   <header>
     <div id="header" class="cyber-razor-bottom">
       <a href="/">
@@ -22,9 +22,11 @@
       </a>
       <div>
         <input type="checkbox" id="menu-toggle" class="menu-checkbox" aria-label="Toggle menu">
+
         <label for="menu-toggle" class="menu-button">
           <span class="hamburger"></span>
         </label>
+
         <nav class="fullscreen-menu cyber-razor-bottom">
           <ul class="menu-links">
             <li><a href="/">JOURNAL</a></li>
@@ -37,49 +39,17 @@
   <main>
     <div class="container">
       <div class="header-spacer"></div>
-
-      <table class="cyber-table cyber-style-2" style="width: 100%;">
-        <thead>
-          <tr>
-            <th style="width: 33vw;">bank</th>
-            <th style="width: 33vw;">type</th>
-            <th style="width: 33vw;">balance</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>cash app</td>
-            <td>bitcoin</td>
-            <td>0.00000000</td>
-          </tr>
-
-          <tr>
-            <td>wallet</td>
-            <td>cash</td>
-            <td>$56.02</td>
-          </tr>
-          <tr>
-            <td>capital one</td>
-            <td>checking</td>
-            <td>$0.29</td>
-          </tr>
-          <tr>
-            <td>capital one</td>
-            <td>savings</td>
-            <td>$0.01</td>
-          </tr>
-          <tr>
-            <td>amex</td>
-            <td>savings</td>
-            <td>$0.03</td>
-          </tr>
-          <tr>
-            <td>capital one</td>
-            <td>credit</td>
-            <td>-$969.26</td>
-          </tr>
-        </tbody>
-      </table>
+      <article about="" typeof="schema:Article" data-journal-day="2026-10-08">
+        <header>
+          <p><time property="schema:dateCreated" datetime="2026-10-08T09:29">10/8/2026</time></p>
+        </header>
+        <section>
+          <p>
+            life is good
+          </p>
+        </section>
+      </article>
+      <nav class="journal-back"><a href="../">← Journal</a></nav>
     </div>
   </main>
 </body>
