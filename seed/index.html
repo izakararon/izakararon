@@ -1,42 +1,40 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="./style.css" rel="stylesheet">
-  <link rel="icon" href="/favicon.ico">
-  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="/images/android-chrome-192x192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="/images/android-chrome-512x512.png">
-  <title>izakar</title>
-</head>
-
-<body prefix="schema: http://schema.org/">
-  <header>
-    <div id="header" class="cyber-razor-bottom">
-      <a href="/">
-        <span class="ia cyberpunk-font-og f-x0-7">
-          <span class="i">I</span> <span class="a">A</span>
-        </span>
-      </a>
-      <div>
-        <input type="checkbox" id="menu-toggle" class="menu-checkbox" aria-label="Toggle menu">
-
-        <label for="menu-toggle" class="menu-button">
-          <span class="hamburger"></span>
-        </label>
-
-        <nav class="fullscreen-menu cyber-razor-bottom">
-          <ul class="menu-links">
-            <li><a href="/">JOURNAL</a></li>
-            <li><a href="/map">MAP</a></li>
-          </ul>
-        </nav>
-      </div>
-    </div>
-  </header>
-  <main><div class="container"><div class="header-spacer"></div>
-<p data-status role="status"></p><div data-journal data-listing="./entries/"></div><noscript><p>enable javascript for journal view, or <a href="./entries/">browse entries</a>.</p></noscript>
-</div></main><script type="module" src="./reader.js"></script>
-</body></html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#19241f" />
+    <title>World</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #19241f;
+      }
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        padding: 24px;
+        color: #d8dfcd;
+        font: 16px system-ui;
+        text-align: center;
+      }
+    </style>
+    <script
+      type="module"
+      crossorigin
+      src="./world-assets/index-48f7f8a8.js"
+    ></script>
+    <link rel="stylesheet" href="./world-assets/index-d1702992.css" />
+  </head>
+  <body>
+    <div class="game"><div class="ui-root"></div></div>
+    <div class="boot" role="status">loading…</div>
+    <noscript>javascript is needed to explore.</noscript>
+  </body>
+</html>
