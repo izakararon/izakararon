@@ -1,0 +1,9 @@
+{
+  "name": "NYC",
+  "short_name": "NYC",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0a1118",
+  "theme_color": "#0a1118"
+}
